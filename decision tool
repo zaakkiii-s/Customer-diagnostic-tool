@@ -1,0 +1,113 @@
+import numpy as np
+import skfuzzy as fuzz
+from skfuzzy import control as ctrl
+import sys
+from PyQt5.QtWidgets import QWidget, QApplication, QLabel, QVBoxLayout, QPushButton, QLineEdit
+
+# Define fuzzy variables
+problem_severity = ctrl.Antecedent(np.arange(0, 11, 1), 'problem_severity')
+urgency = ctrl.Consequent(np.arange(0, 11, 1), 'urgency')
+cost = ctrl.Consequent(np.arange(0, 11, 1), 'cost')
+
+# Define membership functions
+problem_severity['low'] = fuzz.trimf(problem_severity.universe, [0, 0, 5])
+problem_severity['medium'] = fuzz.trimf(problem_severity.universe, [0, 5, 10])
+problem_severity['high'] = fuzz.trimf(problem_severity.universe, [5, 10, 10])
+
+urgency['low'] = fuzz.trimf(urgency.universe, [0, 0, 5])
+urgency['medium'] = fuzz.trimf(urgency.universe, [0, 5, 10])
+urgency['high'] = fuzz.trimf(urgency.universe, [5, 10, 10])
+
+cost['low'] = fuzz.trimf(cost.universe, [0, 0, 5])
+cost['medium'] = fuzz.trimf(cost.universe, [0, 5, 10])
+cost['high'] = fuzz.trimf(cost.universe, [5, 10, 10])
+
+# Define fuzzy rules
+rule1 = ctrl.Rule(problem_severity['low'], [urgency['low'], cost['low']])
+rule2 = ctrl.Rule(problem_severity['medium'], [urgency['medium'], cost['medium']])
+rule3 = ctrl.Rule(problem_severity['high'], [urgency['high'], cost['high']])
+
+# Create control system
+problem_ctrl = ctrl.ControlSystem([rule1, rule2, rule3])
+problem_simulation = ctrl.ControlSystemSimulation(problem_ctrl)
+
+# Possible solutions based on problem severity
+solutions = {
+    'low': "Check your cables and restart your router. If the problem persists, contact support for further assistance.",
+    'medium': "Run a full system diagnostic using the provided software. Follow the steps to troubleshoot and resolve the issue. Contact support if the problem is not resolved.",
+    'high': "Immediate attention required. Contact support for urgent assistance. You may need to replace hardware or reinstall software."
+}
+
+# GUI Application
+class CustomerSupportApp(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.initUI()
+
+    def initUI(self):
+        layout = QVBoxLayout()
+        self.setWindowTitle('Customer Support System')
+        
+        self.problem_label = QLabel('Describe your problem (briefly):')
+        self.problem_field = QLineEdit(self)
+        
+        self.submit_button = QPushButton('Submit')
+        self.submit_button.clicked.connect(self.evaluate_problem)
+
+        self.result_label = QLabel('Evaluation Result:')
+        self.result_text = QLabel(self)
+
+        layout.addWidget(self.problem_label)
+        layout.addWidget(self.problem_field)
+        layout.addWidget(self.submit_button)
+        layout.addWidget(self.result_label)
+        layout.addWidget(self.result_text)
+
+        self.setLayout(layout)
+
+    def evaluate_problem(self):
+        problem_description = self.problem_field.text()
+        severity_score = self.determine_severity(problem_description)
+        
+        problem_simulation.input['problem_severity'] = severity_score
+        problem_simulation.compute()
+
+        urgency_level = problem_simulation.output['urgency']
+        cost_level = problem_simulation.output['cost']
+
+        if urgency_level < 4:
+            solution = solutions['low']
+        elif urgency_level < 7:
+            solution = solutions['medium']
+        else:
+            solution = solutions['high']
+
+        result = (f"Problem Severity Score: {severity_score:.2f}\n"
+                  f"Urgency Level: {urgency_level:.2f}\n"
+                  f"Estimated Cost: {cost_level:.2f}\n"
+                  f"Recommended Solution: {solution}")
+        
+        self.result_text.setText(result)
+
+    def determine_severity(self, description):
+        # Simple heuristic to determine severity based on keywords
+        keywords = {
+            'slow': 3,
+            'error': 5,
+            'not working': 8,
+            'crash': 10,
+            'disconnect': 7,
+            'freeze': 6,
+            'unresponsive': 9
+        }
+        severity = 0
+        for word, score in keywords.items():
+            if word in description.lower():
+                severity = max(severity, score)
+        return severity
+
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    ex = CustomerSupportApp()
+    ex.show()
+    sys.exit(app.exec_())
